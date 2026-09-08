@@ -1,39 +1,33 @@
-/**
- * Articles service — STARTER.
- *
- * PROBLEMS:
- *   - AppError is DEFINED here (and again in middleware/errorHandler.js). It should
- *     live once in utils/AppError.js and be imported in both places.
- *   - process.env.MAX_ARTICLES is read directly here. It should move into
- *     config/index.js and be imported as config.maxArticles.
- */
+const articlesRepo = require('../repository/articlesRepo');
+const AppError = require('../utils/AppError');
+const config = require('../config');
 
-const repo = require('./../repository/articlesRepo');
-
-// DUPLICATED definition — should move to utils/AppError.js
-class AppError extends Error {
-  constructor(message, statusCode) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = true;
-  }
-}
-
-// INLINE process.env read — should move to config/index.js (config.maxArticles)
-const MAX_ARTICLES = parseInt(process.env.MAX_ARTICLES) || 50;
-
-exports.getAll = async () => repo.findAll();
-
-exports.create = async ({ title, body }) => {
-  const count = await repo.count();
-  if (count >= MAX_ARTICLES) {
-    throw new AppError('Article limit reached', 403);
-  }
-  return repo.insert({ title, body });
+exports.listArticles = async () => {
+  return await articlesRepo.findAll();
 };
 
-exports.update = async (id, data) => {
-  const article = await repo.findById(id);
-  if (!article) throw new AppError('Article not found', 404);
-  return repo.update(id, data);
+exports.createArticle = async (data) => {
+  const articles = await articlesRepo.findAll();
+  if (articles.length >= config.maxArticles) {
+    throw new AppError('Article limit reached', 403);
+  }
+  return await articlesRepo.create(data);
+};
+
+exports.getArticleById = async (id) => {
+  const article = await articlesRepo.findById(id);
+  if (!article) {
+    throw new AppError('Article not found', 404);
+  }
+  return article;
+};
+
+exports.updateArticle = async (id, data) => {
+  await exports.getArticleById(id);
+  return await articlesRepo.update(id, data);
+};
+
+exports.deleteArticle = async (id) => {
+  await exports.getArticleById(id);
+  return await articlesRepo.remove(id);
 };
