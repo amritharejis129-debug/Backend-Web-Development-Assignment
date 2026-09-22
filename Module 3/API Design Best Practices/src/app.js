@@ -1,36 +1,19 @@
-const express = require('express');
-const postRoutes = require('./routes/postRoutes');
-const { resetData } = require('./data/postStore');
-const controller = require('./controllers/postController');
+import express from 'express';
+import postRoutes from './routes/postRoutes.js';
+import { sendError } from './utils/http.js';
 
-function createApp() {
-  const app = express();
-  app.use(express.json());
+const app = express();
 
-  app.use('/', postRoutes);
-  app.get('/explode', controller.explode);
+app.use(express.json());
 
-  // TODO:
-  // - make public contract resource-oriented
-  // - standardise success envelope
-  // - standardise error envelope
-  // - add pagination metadata on list route
-  // - cap limit server-side (default limit = 2 for exercise)
-  // - stop exposing old verb routes as public contract
-  // - expose safe internal failure route for testing/demo
+// Mount routes
+app.use('/', postRoutes);
 
-  return app;
-}
+// Global Error Handler - Prevents leaking stack traces to clients
+app.use((err, req, res, next) => {
+  console.error('[SERVER LOG]', err);
 
-if (require.main === module) {
-  const app = createApp();
-  const port = 3000;
-  app.listen(port, () => {
-    console.log(`Starter API listening on port ${port}`);
-  });
-}
+  return sendError(res, 'INTERNAL_ERROR', 'An internal server error occurred', 500);
+});
 
-module.exports = {
-  createApp,
-  resetData
-};
+export default app;

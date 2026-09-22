@@ -1,11 +1,17 @@
-const express = require('express');
-const controller = require('../controllers/postController');
+import { Router } from 'express';
+import * as postController from '../controllers/postController.js';
 
-const router = express.Router();
+const router = Router();
 
-router.get('/getPosts', controller.listPosts);
-router.get('/getPost/:id', controller.getPost);
-router.post('/createPost', controller.createPost);
-router.post('/likePost/:id', controller.likePost);
+// Resource-based Noun Routes
+router.get('/posts', postController.listPosts);
+router.post('/posts', postController.createPost);
+router.get('/posts/:id', postController.getPost);
+router.post('/posts/:id/likes', postController.likePost);
 
-module.exports = router;
+// Internal failure demo route
+router.get('/debug/error', (req, res, next) => {
+  next(new Error('Simulated internal server error'));
+});
+
+export default router;
