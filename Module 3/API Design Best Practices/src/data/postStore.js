@@ -1,52 +1,26 @@
-function seedPosts() {
-  return [
-    { id: 1, title: 'Caching 101', author: 'maya', likes: 0, createdAt: 1 },
-    { id: 2, title: 'Queues vs Cron', author: 'raj', likes: 1, createdAt: 2 },
-    { id: 3, title: 'Why indexes matter', author: 'maya', likes: 3, createdAt: 3 },
-    { id: 4, title: 'JWT expiry gotchas', author: 'sam', likes: 2, createdAt: 4 },
-    { id: 5, title: 'Cursor pagination', author: 'maya', likes: 5, createdAt: 5 }
-  ];
-}
+let posts = [
+  { id: '1', title: 'First Post', content: 'Hello world', likes: 0 },
+  { id: '2', title: 'Second Post', content: 'API Design Best Practices', likes: 3 }
+];
 
-let posts = seedPosts();
-let nextId = 6;
+export const getAllPosts = () => posts;
 
-function resetData() {
-  posts = seedPosts();
-  nextId = 6;
-}
+export const getPostById = (id) => posts.find((p) => p.id === String(id));
 
-function getAllPosts() {
-  return posts.slice();
-}
-
-function getPostById(id) {
-  return posts.find((post) => post.id === Number(id));
-}
-
-function createPost({ title, author }) {
-  const post = {
-    id: nextId++,
+export const createPost = ({ title, content }) => {
+  const newPost = {
+    id: String(posts.length + 1),
     title,
-    author,
-    likes: 0,
-    createdAt: posts.length + 1
+    content: content || '',
+    likes: 0
   };
-  posts.push(post);
-  return post;
-}
+  posts.push(newPost);
+  return newPost;
+};
 
-function incrementLikes(id) {
+export const likePost = (id) => {
   const post = getPostById(id);
   if (!post) return null;
   post.likes += 1;
   return post;
-}
-
-module.exports = {
-  resetData,
-  getAllPosts,
-  getPostById,
-  createPost,
-  incrementLikes
 };

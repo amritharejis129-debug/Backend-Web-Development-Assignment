@@ -1,41 +1,49 @@
-const service = require('../services/postService');
-const http = require('../utils/http');
+import * as postStore from '../data/postStore.js';
+import { sendSuccess, sendError } from '../utils/http.js';
 
-function listPosts(req, res) {
-  const rows = service.listPosts(req.query);
-  return http.sendList(res, rows);
-}
+export const listPosts = (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const rawLimit = parseInt(req.query.limit, 10) || 10;
+  
+  // Server-side capping for limit
+  const limit = Math.min(Math.max(1, rawLimit), 100);
 
-function getPost(req, res) {
-  const post = service.getPost(req.params.id);
+  const allPosts = postStore.getAllPosts();
+  const total = allPosts.length;
+  const pages = Math.ceil(total / limit) || 1;
+  const offset = (page - 1) * limit;
+
+  const paginatedPosts = allPosts.slice(offset, offset + limit);
+
+  return sendSuccess(res, paginatedPosts, 200, {
+    page,
+    limit,
+    total,
+    pages
+  });
+};
+
+export const getPost = (req, res) => {
+  const post = postStore.getPostById(req.params.id);
   if (!post) {
-    return http.sendError(res, 404, { message: 'post missing' });
+    return sendError(res, 'NOT_FOUND', 'Post not found', 404);
   }
-  return http.sendOk(res, post);
-}
+  return sendSuccess(res, post, 200);
+};
 
-function createPost(req, res) {
-  const post = service.createPost(req.body);
-  return http.sendCreated(res, post);
-}
-
-function likePost(req, res) {
-  const post = service.likePost(req.params.id);
-  return http.sendOk(res, { ok: true, likes: post.likes });
-}
-
-function explode(req, res) {
-  try {
-    service.explode();
-  } catch (err) {
-    return http.sendError(res, 500, { error: err.message, stack: err.debug || err.stack });
+export const createPost = (req, res) => {
+  const { title, content } = req.body;
+  if (!title) {
+    return sendError(res, 'VALIDATION_ERROR', 'Title is required', 400);
   }
-}
+  const newPost = postStore.createPost({ title, content });
+  return sendSuccess(res, newPost, 201);
+};
 
-module.exports = {
-  listPosts,
-  getPost,
-  createPost,
-  likePost,
-  explode
+export const likePost = (req, res) => {
+  const updatedPost = postStore.likePost(req.params.id);
+  if (!updatedPost) {
+    return sendError(res, 'NOT_FOUND', 'Post not found', 404);
+  }
+  return sendSuccess(res, updatedPost, 201);
 };
