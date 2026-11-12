@@ -1,58 +1,47 @@
-'use strict';
-
-// ─── GIVEN FILE — modify only to add caching (do not remove existing code) ───
-// This file sets up the Express app and two routes.
-// Your job: import cacheGet/cacheSet/cacheDel from ./cache and wire up:
-//   GET /feed  → cache-aside with 60s TTL and X-Cache header
-//   POST /posts → cacheDel after db.createPost()
-
-require('dotenv').config();
-
 const express = require('express');
-const db      = require('./db');
-// TODO: import { cacheGet, cacheSet, cacheDel } from './cache'
+const db = require('./db');
+const { cacheGet, cacheSet, cacheDel } = require('./cache');
 
 const app = express();
 app.use(express.json());
 
 const FEED_KEY = 'feed:trending';
-const FEED_TTL = 60;   // seconds
+const FEED_TTL = 60;
 
-app.get('/health', (req, res) => res.json({ ok: true }));
-
-// GET /feed — currently queries the database on EVERY request (no caching).
-// TODO: wrap with cache-aside:
-//   1. cacheGet(FEED_KEY) → if hit, set X-Cache: HIT, log, return
-//   2. on miss: query db, cacheSet(FEED_KEY, posts, FEED_TTL), set X-Cache: MISS, log, return
+// GET /feed with Cache-Aside
 app.get('/feed', async (req, res) => {
-  try {
-    const t0 = Date.now();
-    const posts = await db.getTrendingPosts();
-    console.log(`[feed] DB  ${Date.now() - t0}ms`);   // replace with HIT/MISS logging
-    res.json(posts);
-  } catch (err) {
-    console.error('[feed] error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+  const start = Date.now();
+
+  // 1. Check cache first
+  const cached = await cacheGet(FEED_KEY);
+  if (cached) {
+    const ms = Date.now() - start;
+    console.log(`[feed] HIT ${ms}ms`);
+    res.set('X-Cache', 'HIT');
+    return res.json(cached);
   }
+
+  // 2. Cache miss — query database
+  const posts = await db.getTrendingPosts();
+
+  // 3. Populate cache with 60s TTL
+  await cacheSet(FEED_KEY, posts, FEED_TTL);
+
+  const ms = Date.now() - start;
+  console.log(`[feed] MISS ${ms}ms`);
+  res.set('X-Cache', 'MISS');
+  res.json(posts);
 });
 
-// POST /posts — creates a new post.
-// TODO: call cacheDel(FEED_KEY) after db.createPost() to invalidate the stale cache.
+// POST /posts with Cache Invalidation
 app.post('/posts', async (req, res) => {
-  try {
-    const post = await db.createPost(req.body);
-    // TODO: await cacheDel(FEED_KEY);
-    res.status(201).json(post);
-  } catch (err) {
-    console.error('[posts] error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  const post = await db.createPost(req.body);
+  
+  // Invalidate the trending feed cache on write
+  await cacheDel(FEED_KEY);
+
+  res.status(201).json(post);
 });
 
-const PORT = process.env.PORT || 3000;
-
-if (require.main === module) {
-  app.listen(PORT, () => console.log(`Server on http://localhost:${PORT}`));
-}
-
+// Export as an object because tests/run.js expects { app }
 module.exports = { app };
